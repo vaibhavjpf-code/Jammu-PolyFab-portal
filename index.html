@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jammu PolyFab - Sheet Hub & Role Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sheet-container { overflow-x: auto; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col antialiased">
+
+    <!-- LOGIN SCREEN OVERLAY (Appears when not authenticated) -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="text-center mb-6">
+                <div class="bg-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto shadow-lg shadow-indigo-500/30 mb-3">
+                    <i class="fa-solid fa-industry"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900">Jammu PolyFab Portal</h2>
+                <p class="text-xs text-slate-500 mt-1">Enter your department credentials to access authorized Google Sheets</p>
+            </div>
+
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Department Login ID</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                            <i class="fa-solid fa-user text-sm"></i>
+                        </span>
+                        <input type="text" id="login-id-input" required placeholder="e.g. hr_sarah" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Secure Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                            <i class="fa-solid fa-lock text-sm"></i>
+                        </span>
+                        <input type="password" id="login-pass-input" required placeholder="••••••••" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div id="login-error-msg" class="text-xs text-rose-600 font-medium hidden text-center bg-rose-50 p-2 rounded-lg border border-rose-100">
+                    Invalid Login ID or Password. Please try again.
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-indigo-500/25 text-sm flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    <span>Secure Department Login</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app" class="flex h-full w-full overflow-hidden">
+        
+        <!-- SIDEBAR NAVIGATION -->
+        <aside id="sidebar" class="w-64 bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 z-30 shadow-xl hidden md:flex">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-md shadow-indigo-500/30">
+                        <i class="fa-solid fa-industry text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-base tracking-wide">Jammu PolyFab</h1>
+                        <span class="text-xs text-indigo-400 font-medium">Google Sheets Direct Sync</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Department/Role Switcher Indicator -->
+            <div class="px-5 py-4 bg-slate-800/50 border-b border-slate-800">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Active Department</p>
+                <div id="sidebar-role-badge" class="flex items-center space-x-2 text-white font-semibold text-sm">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="current-role-title">Human Resources (HR)</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <button onclick="switchTab('sheets')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white shadow-sm" id="nav-sheets">
+                    <i class="fa-solid fa-table w-5 text-center"></i>
+                    <span>Assigned Google Sheets</span>
+                </button>
+                <button onclick="switchTab('sync')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white" id="nav-sync">
+                    <i class="fa-solid fa-link w-5 text-center"></i>
+                    <span>Google Sheet Links</span>
+                </button>
+                <button onclick="switchTab('analytics')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white" id="nav-analytics">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                    <span>Summary Analytics</span>
+                </button>
+                <button onclick="switchTab('roles')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white" id="nav-roles">
+                    <i class="fa-solid fa-shield-halved w-5 text-center"></i>
+                    <span>Access Control & Logins</span>
+                </button>
+                <button onclick="switchTab('deploy')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:bg-slate-800 hover:text-white" id="nav-deploy">
+                    <i class="fa-solid fa-rocket w-5 text-center"></i>
+                    <span>Run as App (Offline/Web)</span>
+                </button>
+            </nav>
+
+            <!-- User Footer Profile & Logout -->
+            <div class="p-4 border-t border-slate-800 bg-slate-950/40">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div id="user-avatar" class="w-9 h-9 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-500/30">
+                            HR
+                        </div>
+                        <div class="overflow-hidden">
+                            <p id="user-name-display" class="text-sm font-medium text-white truncate">Sarah Jenkins</p>
+                            <p id="user-email-display" class="text-xs text-slate-400 truncate">hr.manager@jammupolyfab.com</p>
+                        </div>
+                    </div>
+                    <button onclick="handleLogout()" class="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-slate-800 transition" title="Sign Out">
+                        <i class="fa-solid fa-power-off text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT WRAPPER -->
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
+            
+            <!-- TOP HEADER -->
+            <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 z-20 shadow-xs">
+                <div class="flex items-center space-x-4">
+                    <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-600 hover:text-slate-900 focus:outline-none">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <div>
+                        <h2 id="page-title" class="text-lg font-bold text-slate-900">Assigned Google Sheets</h2>
+                        <p id="page-subtitle" class="text-xs text-slate-500">Click any assigned sheet to instantly open it directly in Google Sheets in a new tab.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <!-- Sync Status Pill -->
+                    <div class="hidden sm:flex items-center space-x-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span class="text-xs font-semibold text-emerald-700">Server Connected: Secure Auth</span>
+                    </div>
+
+                    <!-- Logout Quick Button -->
+                    <button onclick="handleLogout()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center space-x-2 border border-rose-200 shadow-xs">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- MAIN SCROLLABLE AREA -->
+            <main class="flex-1 overflow-y-auto p-6">
+                
+                <!-- TAB 1: SHEETS VIEW -->
+                <div id="tab-sheets" class="space-y-6">
+                    
+                    <!-- Search & Info Banner -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-base flex items-center space-x-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i>
+                                <span>Direct Google Sheets Launcher</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Showing authorized sheets for <span id="banner-role-name" class="font-bold text-indigo-600">Human Resources (HR)</span>. Click "Open in Google Sheets" to work directly on Google Drive.
+                            </p>
+                        </div>
+                        <div class="relative flex-1 max-w-xs">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                            </span>
+                            <input type="text" id="sheet-search-input" oninput="renderSheetsView()" placeholder="Filter sheets..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+
+                    <!-- Sheets Cards Grid -->
+                    <div id="sheets-display-area" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Dynamically populated via JS -->
+                    </div>
+
+                </div>
+
+                <!-- TAB 2: GOOGLE SHEETS LINKS MANAGER -->
+                <div id="tab-sync" class="space-y-6 hidden">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Google Sheets Master Links Registry</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Manage URLs connecting each department to their designated Google Sheets. <span class="text-indigo-600 font-semibold">Director login allows deleting or adding sheets.</span></p>
+                            </div>
+                            <button onclick="openAddSheetModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition flex items-center space-x-2 shadow-md shadow-indigo-600/20">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>Add New Google Sheet Link</span>
+                            </button>
+                        </div>
+
+                        <!-- Links Table -->
+                        <div class="sheet-container rounded-xl border border-slate-200">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                                        <th class="p-4">Sheet Title</th>
+                                        <th class="p-4">Assigned Department</th>
+                                        <th class="p-4">Google Sheet URL</th>
+                                        <th class="p-4 text-right">Action / Delete</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sync-sources-tbody" class="divide-y divide-slate-100 text-sm">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- GUIDE CARD ON HOW TO DELETE OR ADD -->
+                    <div class="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                        <div class="absolute -right-10 -bottom-10 text-white/5 text-9xl font-bold pointer-events-none">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </div>
+                        <h4 class="text-base font-bold mb-3 flex items-center space-x-2">
+                            <i class="fa-solid fa-circle-info text-indigo-400"></i>
+                            <span>How to Delete or Remove a Sheet Link</span>
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
+                            <div class="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
+                                <div class="font-bold text-white mb-1.5 flex items-center space-x-2">
+                                    <span class="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px]">1</span>
+                                    <span>Log in as Director / Admin</span>
+                                </div>
+                                Switch your active login session to your Director account. Only the Director role has permission to delete links.
+                            </div>
+                            <div class="bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
+                                <div class="font-bold text-white mb-1.5 flex items-center space-x-2">
+                                    <span class="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px]">2</span>
+                                    <span>Click the Delete Button</span>
+                                </div>
+                                Navigate to the <strong class="text-white">"Google Sheet Links"</strong> tab in the sidebar. You will see a red delete button next to each sheet. Click it to instantly delete the sheet from the portal!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: SUMMARY ANALYTICS & SHEET SUMMARY -->
+                <div id="tab-analytics" class="space-y-6 hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-slate-500 uppercase">Total Linked Sheets</span>
+                                <div class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl"><i class="fa-solid fa-file-excel"></i></div>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mt-3" id="stat-sheets-count">4</h4>
+                            <p class="text-xs text-emerald-600 font-medium mt-1"><i class="fa-solid fa-shield-check"></i> Secured by Login ID</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-slate-500 uppercase">Active Departments</span>
+                                <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl"><i class="fa-solid fa-building-user"></i></div>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mt-3">4</h4>
+                            <p class="text-xs text-slate-500 font-medium mt-1">HR, Loom, Maintenance, Admin</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-slate-500 uppercase">Server Status</span>
+                                <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl"><i class="fa-solid fa-server"></i></div>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mt-3">Online</h4>
+                            <p class="text-xs text-emerald-600 font-medium mt-1">Direct Google Drive Sync</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-slate-500 uppercase">Security Isolation</span>
+                                <div class="bg-purple-50 text-purple-600 p-2.5 rounded-xl"><i class="fa-solid fa-lock"></i></div>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mt-3">Strict</h4>
+                            <p class="text-xs text-purple-600 font-medium mt-1">Role-based sheet hiding active</p>
+                        </div>
+                    </div>
+
+                    <!-- DETAILED SHEET SUMMARY TABLE -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+                        <h3 class="text-base font-bold text-slate-900 mb-1">Detailed Sheet Summary & Registry Overview</h3>
+                        <p class="text-xs text-slate-500 mb-4">Complete catalog of all Google Sheets linked across Jammu PolyFab departments.</p>
+                        <div class="sheet-container rounded-xl border border-slate-200">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                                        <th class="p-4">Sheet Name</th>
+                                        <th class="p-4">Department</th>
+                                        <th class="p-4">Description</th>
+                                        <th class="p-4">Google Drive Link Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="analytics-sheets-tbody" class="divide-y divide-slate-100">
+                                    <!-- Populated dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Permissions Summary Matrix -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+                        <h3 class="text-base font-bold text-slate-900 mb-4">Department Login ID & Sheet Mapping Matrix</h3>
+                        <div class="sheet-container rounded-xl border border-slate-200">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                                        <th class="p-4">Login ID</th>
+                                        <th class="p-4">Department / Role</th>
+                                        <th class="p-4">Assigned Google Sheets</th>
+                                        <th class="p-4">Visibility Restriction</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">hr_sarah</td>
+                                        <td class="p-4 font-semibold text-slate-900">Human Resources (HR)</td>
+                                        <td class="p-4"><span class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-medium">Monthly Attendance Sheet</span>, <span class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-medium">Monthly Salary Sheet</span></td>
+                                        <td class="p-4 text-emerald-600 font-semibold text-xs">Only HR Sheets Visible</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">loom_ramesh</td>
+                                        <td class="p-4 font-semibold text-slate-900">Loom Department</td>
+                                        <td class="p-4"><span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-medium">Loom Production Sheet</span></td>
+                                        <td class="p-4 text-emerald-600 font-semibold text-xs">Only Loom Sheet Visible</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">maint_vikram</td>
+                                        <td class="p-4 font-semibold text-slate-900">Maintenance Team</td>
+                                        <td class="p-4"><span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg text-xs font-medium">Maintenance & Repair Log</span></td>
+                                        <td class="p-4 text-emerald-600 font-semibold text-xs">Only Maintenance Sheet Visible</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">admin_rajesh</td>
+                                        <td class="p-4 font-semibold text-slate-900">Factory Director / Master Admin</td>
+                                        <td class="p-4"><span class="text-slate-900 font-bold">All Department Sheets</span></td>
+                                        <td class="p-4 text-purple-600 font-semibold text-xs">Full Master Access</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: ACCESS CONTROL & LOGINS -->
+                <div id="tab-roles" class="space-y-6 hidden">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Registered Department Accounts & Logins</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Manage login IDs, passwords, names, and department permissions. <span class="text-indigo-600 font-semibold">Director login allows adding or editing accounts.</span></p>
+                            </div>
+                            <button onclick="openAddAccountModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition flex items-center space-x-2 shadow-md shadow-indigo-600/20">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>Add New Login Account</span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4" id="role-cards-grid">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: RUN AS APP DEPLOYMENT GUIDE -->
+                <div id="tab-deploy" class="space-y-6 hidden">
+                    <div class="bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                        <div class="absolute right-0 bottom-0 text-white/5 text-9xl font-bold pointer-events-none">
+                            <i class="fa-solid fa-desktop"></i>
+                        </div>
+                        <div class="max-w-2xl">
+                            <div class="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full inline-block mb-3 shadow-sm">Standalone Jammu PolyFab Software</div>
+                            <h3 class="text-2xl font-bold mb-2">How to Run This Software as an App</h3>
+                            <p class="text-slate-300 text-xs leading-relaxed mb-6">
+                                Because this entire software is packaged into a single file, you can run it independently on any computer, laptop, or phone without relying on Gemini! Choose any method below:
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+                            <!-- Method 1 -->
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center font-bold text-base mb-3 shadow-md">
+                                        <i class="fa-solid fa-globe"></i>
+                                    </div>
+                                    <h4 class="font-bold text-sm text-white mb-1">Method 1: Local HTML File</h4>
+                                    <p class="text-xs text-slate-300 leading-relaxed">
+                                        Save the code as <code class="text-indigo-300 font-mono">polyfab-portal.html</code> on your desktop. Double-click it to instantly open it inside Google Chrome, Edge, or Safari like a local app!
+                                    </p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-white/10">
+                                    <span class="text-[11px] text-emerald-400 font-semibold"><i class="fa-solid fa-check"></i> Instant & Offline</span>
+                                </div>
+                            </div>
+
+                            <!-- Method 2 -->
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-base mb-3 shadow-md">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    </div>
+                                    <h4 class="font-bold text-sm text-white mb-1">Method 2: Free Cloud Hosting</h4>
+                                    <p class="text-xs text-slate-300 leading-relaxed">
+                                        Upload the file to <strong class="text-white">Netlify Drop</strong> (drop.netlify.com) or <strong class="text-white">GitHub Pages</strong> for free. You will get a web link that all factory managers can bookmark on their phones or office PCs.
+                                    </p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-white/10">
+                                    <span class="text-[11px] text-emerald-400 font-semibold"><i class="fa-solid fa-check"></i> Accessible Anywhere</span>
+                                </div>
+                            </div>
+
+                            <!-- Method 3 -->
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center font-bold text-base mb-3 shadow-md">
+                                        <i class="fa-solid fa-mobile-screen"></i>
+                                    </div>
+                                    <h4 class="font-bold text-sm text-white mb-1">Method 3: Save to Phone Home Screen</h4>
+                                    <p class="text-xs text-slate-300 leading-relaxed">
+                                        Once hosted online or opened locally, open the menu in Chrome/Safari and select <strong class="text-white">"Add to Home Screen"</strong>. It will appear on your phone just like a mobile app!
+                                    </p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-white/10">
+                                    <span class="text-[11px] text-emerald-400 font-semibold"><i class="fa-solid fa-check"></i> Mobile Friendly</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- CUSTOM TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50 border border-slate-800 text-sm">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-message">Action completed successfully.</span>
+    </div>
+
+    <!-- ADD SHEET MODAL -->
+    <div id="add-sheet-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="flex items-center justify-between mb-6 pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-white text-base shadow-md">
+                        <i class="fa-solid fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Add New Google Sheet</h3>
+                        <p class="text-xs text-slate-500">Link a Google Sheet and assign it to a specific department.</p>
+                    </div>
+                </div>
+                <button onclick="closeAddSheetModal()" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleAddNewSheet(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Sheet Title</label>
+                    <input type="text" id="new-sheet-title" required placeholder="e.g. Factory Safety Inspection Sheet" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Assign to Department</label>
+                    <select id="new-sheet-dept" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                        <option value="HR">Human Resources (HR)</option>
+                        <option value="Loom">Loom Department</option>
+                        <option value="Maintenance">Maintenance Team</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Google Sheet Share URL</label>
+                    <input type="url" id="new-sheet-url" required placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    <p class="text-[11px] text-slate-400 mt-1">Make sure Google Sheet sharing permission is set correctly.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Short Description</label>
+                    <input type="text" id="new-sheet-desc" placeholder="e.g. Weekly machine safety and compliance check" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeAddSheetModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/20">Save & Link Sheet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD/EDIT ACCOUNT MODAL -->
+    <div id="add-account-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="flex items-center justify-between mb-6 pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-white text-base shadow-md">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base" id="account-modal-title">Add New Department Login</h3>
+                        <p class="text-xs text-slate-500">Create a login ID and password for a staff member.</p>
+                    </div>
+                </div>
+                <button onclick="closeAddAccountModal()" class="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveAccount(event)" class="space-y-4">
+                <input type="hidden" id="edit-account-old-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Staff Full Name</label>
+                        <input type="text" id="acc-name" required placeholder="e.g. John Doe" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Initials (Badge)</label>
+                        <input type="text" id="acc-initials" required placeholder="e.g. JD" maxlength="4" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Login ID</label>
+                        <input type="text" id="acc-login-id" required placeholder="e.g. hr_john" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Secure Password</label>
+                        <input type="text" id="acc-password" required placeholder="e.g. pass123" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Role / Department Title</label>
+                    <input type="text" id="acc-title" required placeholder="e.g. HR Assistant Manager" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Allowed Department Access</label>
+                    <select id="acc-allowed-dept" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                        <option value="HR">Human Resources (HR) - Sees HR Sheets</option>
+                        <option value="Loom">Loom Department - Sees Loom Sheets</option>
+                        <option value="Maintenance">Maintenance Team - Sees Maintenance Sheets</option>
+                        <option value="HR,Loom,Maintenance">Director / Admin - Sees All Sheets</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Short Description</label>
+                    <input type="text" id="acc-desc" placeholder="e.g. Manages attendance and employee shifts" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeAddAccountModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/20">Save Login Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const departmentAccounts = [
+            {
+                loginId: 'hr_sarah',
+                password: 'hr123',
+                name: 'Sarah Jenkins',
+                title: 'Human Resources (HR)',
+                email: 'hr.manager@jammupolyfab.com',
+                initials: 'HR',
+                allowedDepartments: ['HR'],
+                desc: 'Manages Attendance Sheet & Salary Sheet.'
+            },
+            {
+                loginId: 'loom_ramesh',
+                password: 'loom123',
+                name: 'Ramesh Kumar',
+                title: 'Loom Department Supervisor',
+                email: 'loom.shift1@jammupolyfab.com',
+                initials: 'LD',
+                allowedDepartments: ['Loom'],
+                desc: 'Manages Loom Production Output Sheet.'
+            },
+            {
+                loginId: 'maint_vikram',
+                password: 'maint123',
+                name: 'Vikram Singh',
+                title: 'Maintenance Lead',
+                email: 'maintenance@jammupolyfab.com',
+                initials: 'MT',
+                allowedDepartments: ['Maintenance'],
+                desc: 'Manages Maintenance & Repair Log Sheet.'
+            },
+            {
+                loginId: 'admin_dhruv',
+                password: 'admin123',
+                name: 'Dhruv Jain',
+                title: 'Factory Director / Master Admin',
+                email: 'dhruv.jain@jammupolyfab.com',
+                initials: 'DJ',
+                allowedDepartments: ['HR', 'Loom', 'Maintenance'],
+                desc: 'Full access to all department Google Sheets.'
+            }
+        ];
+
+        let currentRole = null;
+
+        // Jammu PolyFab Google Sheets Registry
+        let factorySheets = [
+            {
+                id: 'sheet-1',
+                name: 'Monthly Employee Attendance Sheet',
+                department: 'HR',
+                googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+                description: 'Official daily attendance record for all factory shifts and workers.',
+                icon: 'fa-user-clock',
+                color: 'emerald'
+            },
+            {
+                id: 'sheet-2',
+                name: 'Monthly Salary & Payroll Sheet',
+                department: 'HR',
+                googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1CxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+                description: 'Payroll calculations, overtime earnings, and net payable summaries.',
+                icon: 'fa-file-invoice-dollar',
+                color: 'indigo'
+            },
+            {
+                id: 'sheet-3',
+                name: 'Loom Department Production Sheet',
+                department: 'Loom',
+                googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1DxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+                description: 'Daily meter output, loom machine efficiencies, and operator targets.',
+                icon: 'fa-industry',
+                color: 'blue'
+            },
+            {
+                id: 'sheet-4',
+                name: 'Maintenance & Repair Log Sheet',
+                department: 'Maintenance',
+                googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1ExiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+                description: 'Machine breakdowns, spare parts replacement requests, and repair logs.',
+                icon: 'fa-screwdriver-wrench',
+                color: 'amber'
+            }
+        ];
+
+        function handleLoginSubmit(event) {
+            event.preventDefault();
+            const idInput = document.getElementById('login-id-input').value.trim();
+            const passInput = document.getElementById('login-pass-input').value.trim();
+            const errorBox = document.getElementById('login-error-msg');
+
+            const matchedAccount = departmentAccounts.find(acc => acc.loginId === idInput && acc.password === passInput);
+
+            if (matchedAccount) {
+                errorBox.classList.add('hidden');
+                currentRole = matchedAccount;
+                
+                // Hide login screen
+                document.getElementById('login-screen').classList.add('hidden');
+                
+                // Render app data
+                renderCurrentRole();
+                renderSheetsView();
+                renderSyncSources();
+                renderAnalyticsSummary();
+                renderRolesCards();
+                
+                showToast(`Welcome back, ${currentRole.name}! Logged in as ${currentRole.title}.`);
+            } else {
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        // Handle Logout
+        function handleLogout() {
+            currentRole = null;
+            document.getElementById('login-id-input').value = '';
+            document.getElementById('login-pass-input').value = '';
+            document.getElementById('login-error-msg').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            showToast('Successfully signed out of the portal.');
+        }
+
+        function switchTab(tabId) {
+            ['sheets', 'sync', 'analytics', 'roles', 'deploy'].forEach(t => {
+                const tabEl = document.getElementById(`tab-${t}`);
+                const navEl = document.getElementById(`nav-${t}`);
+                if (tabEl) tabEl.classList.add('hidden');
+                if (navEl) {
+                    navEl.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                    navEl.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-white');
+                }
+            });
+
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.classList.remove('text-slate-400', 'hover:bg-slate-800', 'hover:text-white');
+                activeNav.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+            }
+
+            const titles = {
+                sheets: { title: 'Assigned Google Sheets', subtitle: 'Click any assigned sheet to instantly open it directly in Google Sheets in a new tab.' },
+                sync: { title: 'Google Sheet Master URLs', subtitle: 'Direct links connected to your Google Drive sheets.' },
+                analytics: { title: 'Summary Analytics & Sheet Summary', subtitle: 'High-level metrics and complete registry of all factory sheets.' },
+                roles: { title: 'Registered Department Accounts', subtitle: 'Active login credentials and department permissions.' },
+                deploy: { title: 'Run as App Deployment Guide', subtitle: 'Instructions to run this software on desktop and mobile offline or online.' }
+            };
+            if (titles[tabId]) {
+                document.getElementById('page-title').innerText = titles[tabId].title;
+                document.getElementById('page-subtitle').innerText = titles[tabId].subtitle;
+            }
+
+            if (tabId === 'analytics') {
+                renderAnalyticsSummary();
+            }
+        }
+
+        // Render Current Role in Sidebar & Header
+        function renderCurrentRole() {
+            if (!currentRole) return;
+            document.getElementById('current-role-title').innerText = currentRole.title;
+            document.getElementById('user-name-display').innerText = currentRole.name;
+            document.getElementById('user-email-display').innerText = currentRole.email;
+            document.getElementById('user-avatar').innerText = currentRole.initials;
+            document.getElementById('banner-role-name').innerText = currentRole.title;
+        }
+
+        function renderSheetsView() {
+            if (!currentRole) return;
+            const container = document.getElementById('sheets-display-area');
+            const searchTerm = document.getElementById('sheet-search-input')?.value.toLowerCase() || '';
+
+            // STRICT FILTER: Only show sheets belonging to departments allowed for this login ID
+            const filteredSheets = factorySheets.filter(sheet => {
+                const hasAccess = currentRole.allowedDepartments.includes(sheet.department);
+                if (!hasAccess) return false;
+
+                if (!searchTerm) return true;
+                return sheet.name.toLowerCase().includes(searchTerm) || sheet.description.toLowerCase().includes(searchTerm);
+            });
+
+            if (filteredSheets.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
+                        <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-800 text-base">No Google Sheets assigned to this account</h4>
+                        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                            Your login ID (<code class="text-indigo-600 font-semibold">${currentRole.loginId}</code>) restricts visibility to authorized sheets only.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filteredSheets.map(sheet => `
+                <div class="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-${sheet.color}-50 text-${sheet.color}-600 flex items-center justify-center text-xl shadow-inner border border-${sheet.color}-100">
+                                <i class="fa-solid ${sheet.icon}"></i>
+                            </div>
+                            <span class="bg-indigo-50 text-indigo-700 font-semibold text-xs px-3 py-1 rounded-full border border-indigo-100">
+                                ${sheet.department} Department
+                            </span>
+                        </div>
+                        <h3 class="font-bold text-slate-900 text-lg group-hover:text-indigo-600 transition">${sheet.name}</h3>
+                        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">${sheet.description}</p>
+                    </div>
+
+                                    <tr>
+                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">admin_dhruv</td>
+                                        <td class="p-4 font-semibold text-slate-900">Dhruv Jain (Factory Director / Master Admin)</td>
+                                        <td class="p-4"><span class="text-slate-900 font-bold">All Department Sheets</span></td>
+                                        <td class="p-4 text-purple-600 font-semibold text-xs">Full Master Access</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Google Sheets Links Table
+        function renderSyncSources() {
+            if (!currentRole) return;
+            const tbody = document.getElementById('sync-sources-tbody');
+            
+            // Only show sheets the current user has access to in sync tab as well
+            const allowedSheets = factorySheets.filter(s => currentRole.allowedDepartments.includes(s.department));
+            const isAdmin = currentRole.loginId === 'admin_dhruv';
+
+            if (allowedSheets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 text-xs">No sheet links found for this role.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = allowedSheets.map(sheet => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-4 font-semibold text-slate-900 flex items-center space-x-2.5">
+                        <i class="fa-solid fa-file-excel text-emerald-600 text-lg"></i>
+                        <span>${sheet.name}</span>
+                    </td>
+                    <td class="p-4">
+                        <span class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-semibold">${sheet.department}</span>
+                    </td>
+                    <td class="p-4 font-mono text-xs text-indigo-600 truncate max-w-xs">
+                        <a href="${sheet.googleSheetUrl}" target="_blank" class="hover:underline">${sheet.googleSheetUrl}</a>
+                    </td>
+                    <td class="p-4 text-right space-x-2">
+                        <a href="${sheet.googleSheetUrl}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs px-3.5 py-2 rounded-xl transition inline-flex items-center space-x-1.5 border border-emerald-200">
+                            <i class="fa-solid fa-external-link"></i>
+                            <span>Open</span>
+                        </a>
+                        ${isAdmin ? `<button type="button" onclick="deleteSheet('${sheet.id}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs px-3 py-2 rounded-xl transition inline-flex items-center space-x-1.5 border border-rose-200 cursor-pointer"><i class="fa-solid fa-trash"></i><span>Delete</span></button>` : `<span class="text-[11px] text-slate-400 italic">Admin only</span>`}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Render Analytics & Detailed Sheet Summary Table
+        function renderAnalyticsSummary() {
+            document.getElementById('stat-sheets-count').innerText = factorySheets.length;
+            const tbody = document.getElementById('analytics-sheets-tbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = factorySheets.map(sheet => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-4 font-semibold text-slate-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                        <span>${sheet.name}</span>
+                    </td>
+                    <td class="p-4">
+                        <span class="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-semibold">${sheet.department}</span>
+                    </td>
+                    <td class="p-4 text-slate-500 text-xs">${sheet.description}</td>
+                    <td class="p-4">
+                        <span class="inline-flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-semibold border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>Connected & Active</span>
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Add Sheet Modal Controls
+        function openAddSheetModal() {
+            document.getElementById('add-sheet-modal').classList.remove('hidden');
+        }
+
+        function closeAddSheetModal() {
+            document.getElementById('add-sheet-modal').classList.add('hidden');
+            document.getElementById('new-sheet-title').value = '';
+            document.getElementById('new-sheet-url').value = '';
+            document.getElementById('new-sheet-desc').value = '';
+        }
+
+        // Handle Adding New Sheet
+        function handleAddNewSheet(event) {
+            event.preventDefault();
+            const title = document.getElementById('new-sheet-title').value.trim();
+            const dept = document.getElementById('new-sheet-dept').value;
+            const url = document.getElementById('new-sheet-url').value.trim();
+            const desc = document.getElementById('new-sheet-desc').value.trim() || 'Custom factory Google Sheet link';
+
+            const newSheet = {
+                id: 'sheet-' + Date.now(),
+                name: title,
+                department: dept,
+                googleSheetUrl: url,
+                description: desc,
+                icon: dept === 'HR' ? 'fa-file-invoice-dollar' : dept === 'Loom' ? 'fa-industry' : 'fa-screwdriver-wrench',
+                color: dept === 'HR' ? 'indigo' : dept === 'Loom' ? 'blue' : 'amber'
+            };
+
+            factorySheets.push(newSheet);
+            closeAddSheetModal();
+            renderSheetsView();
+            renderSyncSources();
+            renderAnalyticsSummary();
+            showToast('New Google Sheet link successfully added and linked!');
+        }
+
+        function deleteSheet(sheetId) {
+            if (!currentRole || currentRole.loginId !== 'admin_dhruv') {
+                showToast('Permission denied. Only Director role can delete sheets.', true);
+                return;
+            }
+
+            factorySheets = factorySheets.filter(s => s.id !== sheetId);
+            renderSheetsView();
+            renderSyncSources();
+            renderAnalyticsSummary();
+            showToast('Google Sheet link deleted successfully.');
+        }
+
+        // Render Role Cards Matrix
+        function renderRolesCards() {
+            const grid = document.getElementById('role-cards-grid');
+            if (!grid) return;
+
+            const isAdmin = currentRole && currentRole.loginId === 'admin_dhruv';
+
+            grid.innerHTML = departmentAccounts.map(acc => `
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-sm">${acc.initials}</span>
+                            <span class="text-xs font-mono bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600">${acc.loginId}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-sm">${acc.name} - <span class="text-indigo-600">${acc.title}</span></h4>
+                        <p class="text-xs text-slate-500 mt-1">${acc.desc || 'Assigned department staff.'}</p>
+                        <p class="text-xs text-slate-400 mt-2">Password: <code class="text-indigo-600 font-mono font-bold">${acc.password}</code> | Access: <span class="font-semibold text-slate-700">${acc.allowedDepartments.join(', ')}</span></p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 italic">${acc.loginId === 'admin_dhruv' ? 'Master Admin Account' : 'Active Account'}</span>
+                        ${isAdmin ? `
+                            <div class="space-x-2">
+                                <button onclick="editAccount('${acc.loginId}')" class="text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+                                ${acc.loginId !== 'admin_dhruv' ? `<button onclick="deleteAccount('${acc.loginId}')" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"><i class="fa-solid fa-trash"></i> Delete</button>` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Account Modal Management
+        function openAddAccountModal() {
+            if (!currentRole || currentRole.loginId !== 'admin_dhruv') {
+                showToast('Only Director account can add new staff login IDs.', true);
+                return;
+            }
+            document.getElementById('account-modal-title').innerText = 'Add New Department Login';
+            document.getElementById('edit-account-old-id').value = '';
+            document.getElementById('acc-name').value = '';
+            document.getElementById('acc-initials').value = '';
+            document.getElementById('acc-login-id').value = '';
+            document.getElementById('acc-password').value = '';
+            document.getElementById('acc-title').value = '';
+            document.getElementById('acc-desc').value = '';
+            document.getElementById('add-account-modal').classList.remove('hidden');
+        }
+
+        function closeAddAccountModal() {
+            document.getElementById('add-account-modal').classList.add('hidden');
+        }
+
+        function editAccount(loginId) {
+            const acc = departmentAccounts.find(a => a.loginId === loginId);
+            if (!acc) return;
+
+            document.getElementById('account-modal-title').innerText = 'Edit Department Login';
+            document.getElementById('edit-account-old-id').value = acc.loginId;
+            document.getElementById('acc-name').value = acc.name;
+            document.getElementById('acc-initials').value = acc.initials;
+            document.getElementById('acc-login-id').value = acc.loginId;
+            document.getElementById('acc-password').value = acc.password;
+            document.getElementById('acc-title').value = acc.title;
+            document.getElementById('acc-desc').value = acc.desc || '';
+            document.getElementById('acc-allowed-dept').value = acc.allowedDepartments.join(',');
+            document.getElementById('add-account-modal').classList.remove('hidden');
+        }
+
+        function handleSaveAccount(event) {
+            event.preventDefault();
+            const oldId = document.getElementById('edit-account-old-id').value;
+            const name = document.getElementById('acc-name').value.trim();
+            const initials = document.getElementById('acc-initials').value.trim();
+            const loginId = document.getElementById('acc-login-id').value.trim();
+            const password = document.getElementById('acc-password').value.trim();
+            const title = document.getElementById('acc-title').value.trim();
+            const desc = document.getElementById('acc-desc').value.trim();
+            const allowedDeptsStr = document.getElementById('acc-allowed-dept').value;
+            const allowedDepartments = allowedDeptsStr.split(',');
+
+            if (oldId) {
+                const index = departmentAccounts.findIndex(a => a.loginId === oldId);
+                if (index !== -1) {
+                    departmentAccounts[index] = {
+                        loginId,
+                        password,
+                        name,
+                        title,
+                        email: `${loginId}@jammupolyfab.com`,
+                        initials,
+                        allowedDepartments,
+                        desc
+                    };
+                    
+                    // If the user edited their own active login account, update currentRole instantly
+                    if (currentRole && currentRole.loginId === oldId) {
+                        currentRole = departmentAccounts[index];
+                        renderCurrentRole();
+                    }
+                }
+                showToast('Login account updated successfully!');
+            } else {
+                if (departmentAccounts.some(a => a.loginId === loginId)) {
+                    showToast('Login ID already exists. Please pick a unique ID.', true);
+                    return;
+                }
+                departmentAccounts.push({
+                    loginId,
+                    password,
+                    name,
+                    title,
+                    email: `${loginId}@jammupolyfab.com`,
+                    initials,
+                    allowedDepartments,
+                    desc
+                });
+                showToast('New staff login account created successfully!');
+            }
+
+            closeAddAccountModal();
+            renderRolesCards();
+        }
+
+        function deleteAccount(loginId) {
+            if (loginId === 'admin_dhruv') {
+                showToast('Cannot delete primary Director master account.', true);
+                return;
+            }
+            departmentAccounts = departmentAccounts.filter(a => a.loginId !== loginId);
+            renderRolesCards();
+            showToast('Department login account deleted.');
+        }
+
+        // Show Custom Toast Notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = message;
+            if (isError) {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-lg';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // Toggle Mobile Sidebar
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('fixed');
+            sidebar.classList.toggle('inset-y-0');
+            sidebar.classList.toggle('left-0');
+            sidebar.classList.toggle('z-50');
+        }
+    </script>
+</body>
+</html>
